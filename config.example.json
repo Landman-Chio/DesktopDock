@@ -1,0 +1,28 @@
+{
+  "_说明": "DesktopDock 配置。由程序自动维护，也可以手动改（改完重启程序生效）。",
+  "_x_y": "容器位置，WPF 逻辑坐标。设成 -9999 表示自动贴右下角。拖动容器会自动更新这里。",
+  "_width_height": "面板尺寸。注意 44 + itemH×rows + 50 + 26 必须 <= height，否则下方区域会被挤出窗口点不到。",
+  "_cols_rows": "每行几列、可见几行",
+  "_itemW_itemH": "每个图标格尺寸",
+  "_pinned": "已勾选的应用名列表，顺序即显示顺序。留空则默认取名称排序前 cols×rows 个。",
+  "_glass": "capture=抓屏高斯模糊(推荐) / blur,acrylic=走 DWM(部分机器无效) / none=关闭玻璃",
+  "_winBg": "玻璃色调 #AARRGGBB，A 通道就是玻璃浓淡。建议 #88 ~ #BB，越大越实。",
+  "_tint": "DWM 染色，capture 模式下不用，保持全透明",
+  "_topmost": "是否常驻最前",
+  "_selfcheck": "调试用：启动 3 秒后把面板自身渲染成 selfcheck-internal.png",
+
+  "x": -9999,
+  "y": -9999,
+  "width": 416,
+  "height": 500,
+  "cols": 4,
+  "rows": 4,
+  "itemW": 96,
+  "itemH": 92,
+  "pinned": [],
+  "glass": "capture",
+  "winBg": "#99101418",
+  "tint": "#00000000",
+  "topmost": true,
+  "selfcheck": false
+}

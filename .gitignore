@@ -1,0 +1,18 @@
+# 运行时生成的配置(含个人设置: 位置、已选应用列表)。示例见 config.example.json
+config.json
+
+# 运行日志
+*.log
+*.log.old
+
+# 调试产物
+selfcheck-internal.png
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
