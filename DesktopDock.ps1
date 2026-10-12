@@ -57,12 +57,12 @@ $Script:Defaults = [ordered]@{
 # 深浅两套配色。面板透明度(alpha)决定玻璃浓淡, 文字色随主题反转。
 $Script:Palette = @{
     dark = [ordered]@{
-        panel = '#B3101418'; tint = '#00000000'; divider = '#26FFFFFF'
-        field = '#40000000'; hover = '#22FFFFFF'; text = '#FFF8FAFF'; dim = '#C8DCE2F0'
+        panel = '#73101418'; tint = '#00000000'; divider = '#26FFFFFF'
+        field = '#33000000'; hover = '#2EFFFFFF'; text = '#FFF8FAFF'; dim = '#C8DCE2F0'
     }
     light = [ordered]@{
-        panel = '#B3FFFFFF'; tint = '#00000000'; divider = '#30000000'
-        field = '#22000000'; hover = '#1A000000'; text = '#FF14161A'; dim = '#C8505460'
+        panel = '#73FFFFFF'; tint = '#00000000'; divider = '#30000000'
+        field = '#1F000000'; hover = '#26000000'; text = '#FF14161A'; dim = '#C8505460'
     }
 }
 
@@ -591,15 +591,20 @@ function Apply-Position {
         $scale = Get-Scale
         $pw = [int]($win.Width * $scale)
         $ph = [int]($win.Height * $scale)
+        # 桌面层模式贴屏幕右下(并让开任务栏); normal 模式用工作区
+        $area = if ($cfg.dockMode -eq 'desktop') { [System.Windows.Forms.Screen]::PrimaryScreen.Bounds } else { $wa }
+        $barH = [Math]::Max(0, $area.Bottom - $wa.Bottom)
         if ($cfg.x -le -9000 -or $cfg.y -le -9000) {
-            $px = $wa.Right - $pw - [int](20 * $scale)
-            $py = $wa.Bottom - $ph - [int](12 * $scale)
+            $px = $area.Right - $pw - [int](20 * $scale)
+            $py = $area.Bottom - $ph - $barH - [int](12 * $scale)
         } else {
             $px = [int]($cfg.x * $scale)
             $py = [int]($cfg.y * $scale)
         }
-        $px = [Math]::Max($wa.Left, [Math]::Min($px, [Math]::Max($wa.Left, $wa.Right - $pw)))
-        $py = [Math]::Max($wa.Top, [Math]::Min($py, [Math]::Max($wa.Top, $wa.Bottom - $ph)))
+        $px = [Math]::Max($area.Left, [Math]::Min($px, [Math]::Max($area.Left, $area.Right - $pw)))
+        $py = [Math]::Max($area.Top, [Math]::Min($py, [Math]::Max($area.Top, $area.Bottom - $ph)))
+        # 桌面层(Progman 子窗口)实测: SetWindowPos 用的就是屏幕物理坐标, 1:1 无缩放
+        # (标定结果 kx=1.0000 ky=1.0000), 因此不做任何换算, 直接传物理值。
         Place-Window $px $py $pw $ph
         Update-GlassBackdrop $px $py $pw $ph
         $rr = New-Object Native+RECT
@@ -996,20 +1001,46 @@ $Script:ThemePoll.add_Tick({
 })
 #endregion
 
-#region ============ 桌面层嵌入(可选) ============
-# 把窗口挂到桌面图标层, 使其"只在桌面"且不被其他窗口覆盖。
-# 注意: 部分机器的桌面层级结构特殊, 嵌入后可能不渲染, 因此做成可选并可用 probe 自查。
+#region ============ 桌面层嵌入 ============
+# 把窗口挂到桌面图标层(SHELLDLL_DefView)或 Progman, 使其"只在桌面"、不被其他窗口覆盖。
+#
+# 关键点(踩过的坑):
+#   1. SetParent 之前必须先清除 WS_POPUP 并设置 WS_CHILD, 否则跨进程挂载会被拒绝(错误 5)。
+#   2. SetParent 的返回值是"原父窗口", 返回 0 不代表失败; 要用 GetParent 复核是否真的挂上了。
+#   3. 挂载后位置由父窗口坐标系决定, 必须用 SetWindowPos 重新定位(不能再用 WPF 的 Left/Top)。
+#
+# 注意: 此模式下的窗口属于 DWM 桌面合成层, 普通截屏(CopyFromScreen)抓不到它,
+#       所以只能靠肉眼确认, 无法自动验证。
 function Mount-DesktopLayer {
     try {
+        if ($Script:Hwnd -eq [IntPtr]::Zero) { return $false }
         $host_ = [Native]::FindDesktopHost()
-        $Script:DesktopHost = $host_
         if ($host_ -eq [IntPtr]::Zero) {
-            Write-Log '未找到可用的桌面宿主窗口, 退回 normal 模式'
+            Write-Log '未找到桌面宿主窗口, 退回 normal 模式'
             return $false
         }
+        # 1) 清 WS_POPUP, 设 WS_CHILD
+        $st = [Native]::GetWindowLong($Script:Hwnd, [Native]::GWL_STYLE)
+        $st = ($st -band (-bnot [Native]::WS_POPUP)) -bor [Native]::WS_CHILD
+        [void][Native]::SetWindowLong($Script:Hwnd, [Native]::GWL_STYLE, $st)
+        Write-Log ("桌面层: style 已改为 0x{0:X8}" -f $st)
+        # 2) SetParent
         $prev = [Native]::SetParent($Script:Hwnd, $host_)
-        Write-Log ("已嵌入桌面层: 宿主=0x{0:X} SetParent返回=0x{1:X}" -f [int64]$host_, [int64]$prev)
-        return $true
+        $err = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+        Write-Log ("桌面层: SetParent 原父=0x{0:X} 错误={1}" -f [int64]$prev, $err)
+        # 3) 复核是否真的挂上了(SetParent 返回 0 或错误非 0 都不代表失败, 必须查 GetParent)
+        $actual = [Native]::GetParent($Script:Hwnd)
+        if ($actual -eq $host_) {
+            $Script:DesktopHost = $host_
+            Write-Log ("桌面层: 挂载成功, 宿主=0x{0:X}" -f [int64]$host_)
+            return $true
+        }
+        Write-Log ("桌面层: 挂载未生效(实际父=0x{0:X} 期望=0x{1:X}), 退回 normal" -f [int64]$actual, [int64]$host_)
+        # 还原样式, 避免窗口变成不可见的子窗口
+        $st2 = ([Native]::GetWindowLong($Script:Hwnd, [Native]::GWL_STYLE) -band (-bnot [Native]::WS_CHILD)) -bor [Native]::WS_POPUP
+        [void][Native]::SetWindowLong($Script:Hwnd, [Native]::GWL_STYLE, $st2)
+        [void][Native]::SetParent($Script:Hwnd, [IntPtr]::Zero)
+        return $false
     } catch {
         Write-Log ("嵌入桌面层失败: {0}" -f $_.Exception.Message)
         return $false
@@ -1017,29 +1048,39 @@ function Mount-DesktopLayer {
 }
 
 function Invoke-Probe {
-    # 自查: 枚举桌面层级 + 渲染自查, 用于判断能否用 desktop 模式
-    Write-Log '=== 桌面层探针开始 ==='
-    $progman = [Native]::FindWindow('Progman', $null)
-    Write-Log ("Progman: 0x{0:X}" -f [int64]$progman) -Echo
+    # 自查桌面层可用性。判断依据是"SetParent 后 GetParent 是否真的变成宿主",
+    # 而不是判断 Progman 是否存在 —— 之前用 FindWindow("Progman") 得到 0 就下结论, 是错的。
+    Write-Log '=== 桌面层探针开始 ===' -Echo
+    $progman = [Native]::GetShellWindow()
+    $defview = [IntPtr]::Zero
+    if ($progman -ne [IntPtr]::Zero) { $defview = [Native]::FindWindowEx($progman, [IntPtr]::Zero, 'SHELLDLL_DefView', $null) }
+    Write-Log ("Progman = 0x{0:X}" -f [int64]$progman) -Echo
+    Write-Log ("SHELLDLL_DefView = 0x{0:X}" -f [int64]$defview) -Echo
+
     $host_ = [Native]::FindDesktopHost()
-    Write-Log ("可用桌面宿主: 0x{0:X}" -f [int64]$host_) -Echo
-    $defCount = 0
-    if ($progman -ne [IntPtr]::Zero -and [Native]::FindWindowEx($progman, [IntPtr]::Zero, 'SHELLDLL_DefView', $null) -ne [IntPtr]::Zero) { $defCount++ }
-    $worker = [Native]::FindWindowEx([IntPtr]::Zero, [IntPtr]::Zero, 'WorkerW', $null)
-    $n = 0
-    while ($worker -ne [IntPtr]::Zero -and $n -lt 60) {
-        $n++
-        if ([Native]::FindWindowEx($worker, [IntPtr]::Zero, 'SHELLDLL_DefView', $null) -ne [IntPtr]::Zero) { $defCount++ }
-        $worker = [Native]::FindWindowEx([IntPtr]::Zero, $worker, 'WorkerW', $null)
+    Write-Log ("FindDesktopHost = 0x{0:X}" -f [int64]$host_) -Echo
+
+    # 实测挂载: 真挂一次, 看 GetParent 是否变成宿主, 再还原
+    $ok = $false
+    if ($Script:Hwnd -ne [IntPtr]::Zero -and $host_ -ne [IntPtr]::Zero) {
+        $st = [Native]::GetWindowLong($Script:Hwnd, [Native]::GWL_STYLE)
+        $st2 = ($st -band (-bnot [Native]::WS_POPUP)) -bor [Native]::WS_CHILD
+        [void][Native]::SetWindowLong($Script:Hwnd, [Native]::GWL_STYLE, $st2)
+        $prev = [Native]::SetParent($Script:Hwnd, $host_)
+        $err = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+        $actual = [Native]::GetParent($Script:Hwnd)
+        $ok = ($actual -eq $host_)
+        Write-Log ("实测挂载: SetParent 原父=0x{0:X} 错误={1} 之后 GetParent=0x{2:X} => {3}" -f `
+            [int64]$prev, $err, [int64]$actual, $(if ($ok) { '成功' } else { '未生效' })) -Echo
+        # 还原为普通顶层窗口
+        [void][Native]::SetParent($Script:Hwnd, [IntPtr]::Zero)
+        $st3 = ([Native]::GetWindowLong($Script:Hwnd, [Native]::GWL_STYLE) -band (-bnot [Native]::WS_CHILD)) -bor [Native]::WS_POPUP
+        [void][Native]::SetWindowLong($Script:Hwnd, [Native]::GWL_STYLE, $st3)
     }
-    Write-Log ("WorkerW 总数: {0}, 其中含 SHELLDLL_DefView 的: {1}" -f $n, $defCount) -Echo
-    if ($defCount -eq 0 -and $progman -eq [IntPtr]::Zero) {
-        Write-Log '结论: 桌面层级结构异常, desktop 模式很可能不渲染 —— 建议保持 dockMode=normal' -Echo
-    } elseif ($defCount -eq 0) {
-        Write-Log '结论: 图标层在 Progman 下, desktop 模式可能可用, 建议实测' -Echo
-    } else {
-        Write-Log '结论: 找到标准图标层, desktop 模式可用' -Echo
-    }
+
+    if ($ok) { Write-Log '结论: desktop 模式可用 —— 实测已成功挂到桌面层' -Echo }
+    elseif ($defview -ne [IntPtr]::Zero) { Write-Log '结论: 找到桌面图标层但挂载未生效, 建议用 normal 模式' -Echo }
+    else { Write-Log '结论: 桌面层级结构特殊, 建议用 normal 模式' -Echo }
     Write-Log '=== 桌面层探针结束 ==='
 }
 #endregion

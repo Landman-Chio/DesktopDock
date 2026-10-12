@@ -63,7 +63,7 @@
 | `cols` / `rows` | 每行几列、可见几行 | 4 / 4 |
 | `itemW` / `itemH` | 每个图标格尺寸 | 53 / 40 |
 | `pinned` | 已选应用名列表（顺序即显示顺序） | `[]` |
-| `dockMode` | `normal`（顶层窗口，会被其他窗口盖住）/ `desktop`（嵌入桌面图标层） | `normal` |
+| `dockMode` | **`desktop`**（嵌入桌面层，其他窗口盖不住）/ `normal`（普通顶层窗口） | `desktop` |
 | `theme` | `auto`（跟随 Windows 深浅模式）/ `dark` / `light` | `auto` |
 | `glass` | `capture`（抓屏高斯模糊）/ `blur` `acrylic`（走 DWM，部分机器无效）/ `none` | `capture` |
 | `blurRadius` | 高斯模糊半径，**越大越糊越明显** | `22` |
@@ -86,12 +86,14 @@
 它读的是 `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize\AppsUseLightTheme`，
 跟 [ThemeAutoSwitch](https://github.com/Landman-Chio/ThemeAutoSwitch) 写的是同一处 —— 所以两个工具可以配合使用。
 
-### 窗口层级：只停留在桌面
+### 窗口层级：贴在桌面上
 
-| `dockMode` | 行为 | 可靠性 |
-|---|---|---|
-| `normal`（默认） | 普通顶层窗口、**不置顶**。点一下或用 `Ctrl+Alt+D` 唤到最前；被其他窗口盖住 | 所有系统都能渲染 |
-| `desktop` | 嵌入桌面图标层，**其他窗口不会盖住它**，真正做到"只在桌面" | ⚠️ 依赖桌面层级结构，部分机器不渲染 |
+| `dockMode` | 行为 |
+|---|---|
+| `desktop`（默认，推荐） | 把窗口挂进桌面层（`Progman` 的子窗口）。**它不遮挡其他应用，其他应用也不会盖住它** —— 它就"属于桌面"，和桌面图标同一层 |
+| `normal` | 普通顶层窗口、**不置顶**。会被其他应用盖住，点一下或用 `Ctrl+Alt+D` 唤到最前 |
+
+`desktop` 模式已在目标机器上实测通过：`SetParent` 成功、`GetParent` 复核一致、定位精确落在目标物理坐标。
 
 先用探针自查你的机器适不适合 `desktop`：
 

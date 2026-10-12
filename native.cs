@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -7,11 +7,15 @@ public static class Native
     [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
     [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr GetShellWindow();
+    [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr FindWindowEx(IntPtr parent, IntPtr childAfter, string className, string windowName);
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
     [DllImport("user32.dll", SetLastError = true)]
     public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
     [DllImport("user32.dll", SetLastError = true)]
@@ -41,6 +45,8 @@ public static class Native
     [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr SetParent(IntPtr hWndChild, IntPtr hWndNewParent);
     [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr GetParent(IntPtr hWnd);
+    [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam, uint flags, uint timeout, out IntPtr result);
 
     public const uint WM_SPAWN_WORKER = 0x052C;
@@ -48,23 +54,34 @@ public static class Native
 
     /// <summary>
     /// 找一个可以承载"桌面挂件"的宿主窗口。
-    /// 依次尝试: Progman(图标层在它下面时) -> 含 SHELLDLL_DefView 的 WorkerW 的同级 WorkerW。
+    ///
+    /// 桌面层级有两种常见结构, 都要兼容:
+    ///   ① Progman -> SHELLDLL_DefView            (Win11 常见; 实测目标机器就是这种)
+    ///   ② WorkerW -> SHELLDLL_DefView + 同级 WorkerW  (Win10 及部分 Win11)
+    ///
+    /// 优先返回 Progman: SHELLDLL_DefView 是 WS_EX_LAYERED 窗口, 把子窗口挂到它上面
+    /// 在部分系统上不渲染; 挂到 Progman 则稳定, 且天然位于图标层之上。
     /// 找不到就返回 IntPtr.Zero, 调用方应退回普通顶层窗口模式。
     /// </summary>
     public static IntPtr FindDesktopHost()
     {
-        IntPtr progman = FindWindow("Progman", null);
-        IntPtr result = IntPtr.Zero;
+        // GetShellWindow 比 FindWindow("Progman") 可靠: 后者受调用进程 DPI 感知上下文影响, 实测会返回 0
+        IntPtr progman = GetShellWindow();
+        if (progman == IntPtr.Zero) progman = FindWindow("Progman", null);
         if (progman != IntPtr.Zero)
         {
-            // 让 Progman 派生出承载壁纸的 WorkerW
-            SendMessageTimeout(progman, WM_SPAWN_WORKER, new IntPtr(0xD), new IntPtr(0x1), SMTO_NORMAL, 1000, out result);
+            // 触发 Progman 派生出承载壁纸的 WorkerW(部分系统需要)
+            IntPtr res;
+            SendMessageTimeout(progman, WM_SPAWN_WORKER, new IntPtr(0xD), new IntPtr(0x1), SMTO_NORMAL, 1000, out res);
+
+            // 结构①: 图标层直接挂在 Progman 下 -> 就用 Progman
             if (FindWindowEx(progman, IntPtr.Zero, "SHELLDLL_DefView", null) != IntPtr.Zero)
             {
                 return progman;
             }
         }
-        // 图标层通常挂在某个 WorkerW 下, 可绘制层是它后面的同级 WorkerW
+
+        // 结构②: 图标层挂在某个 WorkerW 下 -> 用它的同级 WorkerW 作为可绘制层
         IntPtr worker = FindWindowEx(IntPtr.Zero, IntPtr.Zero, "WorkerW", null);
         while (worker != IntPtr.Zero)
         {
@@ -75,7 +92,9 @@ public static class Native
             }
             worker = FindWindowEx(IntPtr.Zero, worker, "WorkerW", null);
         }
-        return IntPtr.Zero;
+
+        // 兜底: 至少还有 Progman
+        return progman;
     }
 
     public delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
@@ -126,9 +145,13 @@ public static class Native
     public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
 
     public const int GWL_EXSTYLE = -20;
+    public const int GWL_STYLE = -16;
     public const int WS_EX_NOACTIVATE = 0x08000000;
     public const int WS_EX_TOOLWINDOW = 0x00000080;
     public const int WS_EX_LAYERED = 0x00080000;
+    // 挂载为桌面子窗口需要: 先清 WS_POPUP 再设 WS_CHILD, 否则跨进程 SetParent 会返回错误 5
+    public const int WS_CHILD = 0x40000000;
+    public const int WS_POPUP = unchecked((int)0x80000000);
 
     // SetWindowCompositionAttribute 的属性号与状态值
     public const int WCA_ACCENT_POLICY = 19;
@@ -215,7 +238,9 @@ public static class Native
     public static void MoveKeepTop(IntPtr hwnd, int x, int y, int w, int h)
     {
         if (hwnd == IntPtr.Zero) return;
-        SetWindowPos(hwnd, HWND_TOPMOST, x, y, w, h, SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+        // 用 HWND_TOP 而不是 HWND_TOPMOST: 挂到桌面层后窗口是 Progman 的子窗口,
+        // 子窗口再设 WS_EX_TOPMOST 会让坐标解释出错(实测偏移到 (152,152))。
+        SetWindowPos(hwnd, HWND_TOP, x, y, w, h, SWP_NOACTIVATE | SWP_NOOWNERZORDER);
     }
 
     /// <summary>抬到最前: 只改 z 序, 不动位置尺寸。</summary>
