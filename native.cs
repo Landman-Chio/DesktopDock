@@ -238,9 +238,22 @@ public static class Native
     public static void MoveKeepTop(IntPtr hwnd, int x, int y, int w, int h)
     {
         if (hwnd == IntPtr.Zero) return;
-        // 用 HWND_TOP 而不是 HWND_TOPMOST: 挂到桌面层后窗口是 Progman 的子窗口,
-        // 子窗口再设 WS_EX_TOPMOST 会让坐标解释出错(实测偏移到 (152,152))。
+        // 用 HWND_TOP 而不是 HWND_TOPMOST: 子窗口再设 WS_EX_TOPMOST 会让坐标解释出错
+        // (实测请求 (1806,987) 却落到 (152,152))。
         SetWindowPos(hwnd, HWND_TOP, x, y, w, h, SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+    }
+
+    /// <summary>
+    /// 定位到指定物理坐标, 并压到 z 序最底(贴桌面)。
+    /// 这是"只在桌面"的可靠做法: 不用 SetParent —— 实测把窗口挂到 Progman 虽然
+    /// SetParent/GetParent 都成功, 但窗口不渲染(SHELLDLL_DefView 是 WS_EX_LAYERED,
+    /// 本机 DWM 分层合成对子窗口不可靠)。
+    /// 代价: 最大化的应用会盖住它 —— 这正是"待在桌面"应有的行为。
+    /// </summary>
+    public static void MoveToBottom(IntPtr hwnd, int x, int y, int w, int h)
+    {
+        if (hwnd == IntPtr.Zero) return;
+        SetWindowPos(hwnd, HWND_BOTTOM, x, y, w, h, SWP_NOACTIVATE | SWP_NOOWNERZORDER);
     }
 
     /// <summary>抬到最前: 只改 z 序, 不动位置尺寸。</summary>

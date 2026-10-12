@@ -47,6 +47,9 @@ $Script:Defaults = [ordered]@{
     itemH      = 40
     pinned     = @()
     glass      = 'capture'
+    # normal         顶层窗口、不置顶 —— 已确证可见; 会被其他应用盖住
+    # desktop-bottom 同上, 但用 SetWindowPos(HWND_BOTTOM) 压到 z 序最底, 更"贴桌面"
+    # desktop        挂进 Progman 桌面层 —— 本机 SetParent/GetParent 都成功但窗口不渲染, 不可用
     dockMode   = 'normal'
     theme      = 'auto'
     blurRadius = 22
@@ -526,8 +529,9 @@ function Get-Scale {
 function Place-Window([int]$px, [int]$py, [int]$pw, [int]$ph) {
     try {
         if ($Script:Hwnd -eq [IntPtr]::Zero) { return }
-        if ($cfg.dockMode -eq 'desktop' -and $Script:DesktopHost -ne [IntPtr]::Zero) {
-            [Native]::MoveKeepTop($Script:Hwnd, $px, $py, $pw, $ph)
+        if ($cfg.dockMode -eq 'desktop-bottom') {
+            # 直接按屏幕物理像素定位, 并压到 z 序最底(贴桌面, 不遮挡其他应用)
+            [Native]::MoveToBottom($Script:Hwnd, $px, $py, $pw, $ph)
         } else {
             $scale = Get-Scale
             if ($scale -le 0) { $scale = 1 }
@@ -592,7 +596,7 @@ function Apply-Position {
         $pw = [int]($win.Width * $scale)
         $ph = [int]($win.Height * $scale)
         # 桌面层模式贴屏幕右下(并让开任务栏); normal 模式用工作区
-        $area = if ($cfg.dockMode -eq 'desktop') { [System.Windows.Forms.Screen]::PrimaryScreen.Bounds } else { $wa }
+        $area = if ($cfg.dockMode -like 'desktop*') { [System.Windows.Forms.Screen]::PrimaryScreen.Bounds } else { $wa }
         $barH = [Math]::Max(0, $area.Bottom - $wa.Bottom)
         if ($cfg.x -le -9000 -or $cfg.y -le -9000) {
             $px = $area.Right - $pw - [int](20 * $scale)

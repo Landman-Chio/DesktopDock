@@ -63,7 +63,7 @@
 | `cols` / `rows` | 每行几列、可见几行 | 4 / 4 |
 | `itemW` / `itemH` | 每个图标格尺寸 | 53 / 40 |
 | `pinned` | 已选应用名列表（顺序即显示顺序） | `[]` |
-| `dockMode` | **`desktop`**（嵌入桌面层，其他窗口盖不住）/ `normal`（普通顶层窗口） | `desktop` |
+| `dockMode` | `normal`（普通顶层窗口，已实测可见）/ `desktop-bottom`（压到最底）/ `desktop`（嵌入桌面层，本机不渲染） | `normal` |
 | `theme` | `auto`（跟随 Windows 深浅模式）/ `dark` / `light` | `auto` |
 | `glass` | `capture`（抓屏高斯模糊）/ `blur` `acrylic`（走 DWM，部分机器无效）/ `none` | `capture` |
 | `blurRadius` | 高斯模糊半径，**越大越糊越明显** | `22` |
@@ -86,16 +86,24 @@
 它读的是 `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize\AppsUseLightTheme`，
 跟 [ThemeAutoSwitch](https://github.com/Landman-Chio/ThemeAutoSwitch) 写的是同一处 —— 所以两个工具可以配合使用。
 
-### 窗口层级：贴在桌面上
+### 窗口层级：待在桌面上
 
-| `dockMode` | 行为 |
-|---|---|
-| `desktop`（默认，推荐） | 把窗口挂进桌面层（`Progman` 的子窗口）。**它不遮挡其他应用，其他应用也不会盖住它** —— 它就"属于桌面"，和桌面图标同一层 |
-| `normal` | 普通顶层窗口、**不置顶**。会被其他应用盖住，点一下或用 `Ctrl+Alt+D` 唤到最前 |
+| `dockMode` | 行为 | 可靠性 |
+|---|---|---|
+| `normal`（默认） | 普通顶层窗口、**不置顶**。会被其他应用盖住，点一下或用 `Ctrl+Alt+D` 唤到最前 | ✅ 已实测可见 |
+| `desktop-bottom` | 同上，但用 `SetWindowPos(HWND_BOTTOM)` 压到 z 序最底，更"贴桌面" | ✅ 已实测可见 |
+| `desktop` | 把窗口挂进桌面层（`Progman` 的子窗口），理论上最接近"桌面挂件" | ⚠️ **本机实测不可用**：`SetParent`/`GetParent` 都成功，但窗口不渲染 |
 
-`desktop` 模式已在目标机器上实测通过：`SetParent` 成功、`GetParent` 复核一致、定位精确落在目标物理坐标。
+**关于 `desktop` 模式**：曾尝试把窗口 `SetParent` 到 `Progman`。技术指标全部通过
+（`SetParent` 错误=0、`GetParent` 复核一致、定位精确落在目标物理坐标），
+**但窗口始终不显示**。原因是 `SHELLDLL_DefView` 本身是 `WS_EX_LAYERED` 窗口，
+由 DWM 分层合成，跨进程嵌入子窗口在这类系统上不可靠 —— 同一台机器上 DWM 的
+`SetWindowCompositionAttribute`（亚克力）也是"返回成功但无效果"。
 
-先用探针自查你的机器适不适合 `desktop`：
+所以本项目用**顶层窗口 + 不置顶 + 可选沉底**实现"待在桌面"。
+代价是最大化的窗口会盖住它 —— 这也正是"待在桌面"应有的行为。
+
+也可以用探针自查你的机器桌面层级：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\DesktopDock.ps1 -Action probe
