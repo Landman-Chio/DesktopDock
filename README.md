@@ -11,6 +11,19 @@
 
 ---
 
+## 下载
+
+| 方式 | 命令 / 操作 | 说明 |
+|---|---|---|
+| **ZIP（推荐）** | 点页面右上角 **Code → Download ZIP**，解压后双击 `launcher.vbs` | 包含全部文件和示例配置，最省事 |
+| git 克隆 | `git clone https://github.com/Landman-Chio/DesktopDock.git` | 方便后续 `git pull` 更新 |
+| 单个文件 | 打开文件 → 点 **Raw** | 也能用，但会**缺少 `config.example.json` 示例配置** |
+
+> 已验证：单独下载的 `.vbs` 文件（即便行尾被转成 LF）也能正常双击运行。
+
+---
+
+
 ## 特性
 
 | 特性 | 说明 |
@@ -155,6 +168,16 @@ with a built-in search box.**
 ![DesktopDock screenshot](preview.png)
 
 Click an icon to launch it, type to search, scroll for more, drag it anywhere.
+
+### Download
+
+| Option | How | Notes |
+|---|---|---|
+| **ZIP (recommended)** | **Code → Download ZIP**, unzip, double-click `launcher.vbs` | Includes everything plus an example config |
+| git clone | `git clone https://github.com/Landman-Chio/DesktopDock.git` | Easy to `git pull` for updates |
+| Single file | Open a file, click **Raw** | Works, but you will **miss the `config.example.json`** |
+
+> Verified: a `.vbs` downloaded on its own (even with LF line endings) still runs on double-click.
 
 ### Features
 
