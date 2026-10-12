@@ -38,6 +38,45 @@ public static class Native
     public static extern bool DeleteObject(IntPtr hObject);
     [DllImport("user32.dll")]
     public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr SetParent(IntPtr hWndChild, IntPtr hWndNewParent);
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam, uint flags, uint timeout, out IntPtr result);
+
+    public const uint WM_SPAWN_WORKER = 0x052C;
+    public const uint SMTO_NORMAL = 0x0000;
+
+    /// <summary>
+    /// 找一个可以承载"桌面挂件"的宿主窗口。
+    /// 依次尝试: Progman(图标层在它下面时) -> 含 SHELLDLL_DefView 的 WorkerW 的同级 WorkerW。
+    /// 找不到就返回 IntPtr.Zero, 调用方应退回普通顶层窗口模式。
+    /// </summary>
+    public static IntPtr FindDesktopHost()
+    {
+        IntPtr progman = FindWindow("Progman", null);
+        IntPtr result = IntPtr.Zero;
+        if (progman != IntPtr.Zero)
+        {
+            // 让 Progman 派生出承载壁纸的 WorkerW
+            SendMessageTimeout(progman, WM_SPAWN_WORKER, new IntPtr(0xD), new IntPtr(0x1), SMTO_NORMAL, 1000, out result);
+            if (FindWindowEx(progman, IntPtr.Zero, "SHELLDLL_DefView", null) != IntPtr.Zero)
+            {
+                return progman;
+            }
+        }
+        // 图标层通常挂在某个 WorkerW 下, 可绘制层是它后面的同级 WorkerW
+        IntPtr worker = FindWindowEx(IntPtr.Zero, IntPtr.Zero, "WorkerW", null);
+        while (worker != IntPtr.Zero)
+        {
+            if (FindWindowEx(worker, IntPtr.Zero, "SHELLDLL_DefView", null) != IntPtr.Zero)
+            {
+                IntPtr sibling = FindWindowEx(IntPtr.Zero, worker, "WorkerW", null);
+                return sibling != IntPtr.Zero ? sibling : worker;
+            }
+            worker = FindWindowEx(IntPtr.Zero, worker, "WorkerW", null);
+        }
+        return IntPtr.Zero;
+    }
 
     public delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
 

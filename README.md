@@ -1,248 +1,183 @@
-# DesktopDock
+# DesktopDock · 桌面应用收纳容器
 
-**把常用程序收进桌面上一个高斯玻璃面板：4×4 图标网格 + 内置搜索。**
+一个常驻桌面的**高斯玻璃**面板：固定 4 列 × 4 行图标，第 5 行是搜索栏，更多应用用滚轮滑出来。
 
-[English](#english) · 中文
-
-![DesktopDock 截图](preview.png)
-
-平时就是一个深色玻璃面板，点图标直接启动程序，输入名字即时搜索，
-滚轮滑动浏览更多，拖到哪它就在哪。
-
----
-
-## 下载
-
-| 方式 | 命令 / 操作 | 说明 |
-|---|---|---|
-| **ZIP（推荐）** | 点页面右上角 **Code → Download ZIP**，解压后双击 `launcher.vbs` | 包含全部文件和示例配置，最省事 |
-| git 克隆 | `git clone https://github.com/Landman-Chio/DesktopDock.git` | 方便后续 `git pull` 更新 |
-| 单个文件 | 打开文件 → 点 **Raw** | 也能用，但会**缺少 `config.example.json` 示例配置** |
-
-> 已验证：单独下载的 `.vbs` 文件（即便行尾被转成 LF）也能正常双击运行。
-
----
-
-
-## 特性
-
-| 特性 | 说明 |
-|---|---|
-| **高斯玻璃** | 面板背后是真模糊，不是单纯半透明（实现见下） |
-| **4 × 4 网格** | 每行 4 个、可见 4 行；更多应用用滚轮滑出来 |
-| **搜索栏** | 第 5 行；搜的是**全部已安装应用**，不只是面板里显示的 |
-| **图标按钮** | 标题栏三个矢量图标：编辑 ✎ / 隐藏 ◡ / 退出 ⏻ |
-| **拖动** | 按住面板空白处或标题栏拖走，位置自动记住 |
-| **自定义顺序** | 编辑器里 ▲▼ 调整顺序，勾选顺序即显示顺序 |
-| **全局快捷键** | `Ctrl + Alt + D` 隐藏 / 唤出 |
-| **零依赖** | 纯 PowerShell + WPF，不用装 .NET SDK、不用管理员权限 |
-
-无需管理员权限。不写注册表、不装服务、不加驱动 —— **卸载就是删文件夹**。
+```
+┌──────────────────────────────┐
+│ 应用容器 · 16      ✎  ◡  ⏻  │  ← 编辑 / 隐藏 / 退出（图标按钮）
+│  [◧]  [▦]  [◈]  [▣]         │
+│  [◎]  [◍]  [◒]  [◐]         │  ← 4×4，滚轮上下滑动看更多
+│  [◔]  [◕]  [◑]  [◖]         │
+│  [◗]  [◘]  [◙]  [◚]         │
+│  🔍 输入名称筛选…             │  ← 搜索栏
+│   滚轮浏览 · 点击启动 · 拖动移动│
+└──────────────────────────────┘
+```
 
 ## 快速开始
 
-需要 Windows 10 / 11（自带 PowerShell 5.1 与 WPF 即可）。
+双击 **`启动容器.vbs`**（无控制台窗口、无 UAC 弹窗）。
 
-**双击 `launcher.vbs`** 启动（无控制台窗口）。
-
-面板默认出现在屏幕右下角。想开机自启：
-
-```powershell
-.\autostart.ps1 -Action install   # 启用
-.\autostart.ps1 -Action remove    # 关闭
-```
-
-## 操作
+## 操作说明
 
 | 操作 | 效果 |
 |---|---|
-| 点击图标 | 启动程序，面板回到未筛选状态 |
-| 滚轮 | 上下滑动应用区 |
-| 搜索框输入 | 实时筛选全部应用 |
-| 搜索框 Enter | 直接启动第一个结果 |
-| 搜索框 Esc | 清空搜索 |
-| 拖动面板空白处 / 标题栏 | 移动位置并自动保存 |
-| `Ctrl + Alt + D` | 隐藏 / 唤出 |
+| 点击图标 | 启动该程序，面板自动回到未筛选状态 |
+| 滚轮 | 上下滑动应用区（16 个放不下时使用） |
+| 搜索框输入 | 实时筛选；**搜索范围是全部 70 个应用**，不限于已勾选的 |
+| 搜索框按 Enter | 直接启动第一个结果 |
+| 搜索框按 Esc / 点 ✕ | 清空搜索 |
+| 拖动面板空白处或顶部按钮左侧区域 | 移动位置并自动保存 |
+| **Ctrl + Alt + D** | 全局快捷键，隐藏 / 唤出容器 |
 | 右键面板 | 编辑 / 隐藏 / 退出 |
 
-## 换成你自己的程序
+## 三个按钮（macOS 交通灯样式）
 
-默认会按名称顺序取前 16 个（所以多半是 `Administrative Tools` 这类系统工具）。
+面板**没有标题栏**，右上角只有三个小圆点按钮（静止是圆点、悬停放大并显示符号），从左到右：
 
-点标题栏的 **✎** 打开编辑器（非模态，面板仍可用）：
+| 图标 | 功能 |
+|---|---|
+| ✎ 铅笔 | 打开编辑器：勾选应用 + 调整顺序 |
+| ◡ 闭眼 | 隐藏容器（移出屏幕，Ctrl+Alt+D 可唤回） |
+| ⏻ 电源 | 退出 DesktopDock |
 
-- **右侧「全部应用」**：勾选加入面板
-- **左侧「当前显示顺序」**：每行有 ▲▼✕，上移 / 下移 / 移除
-- 顶部搜索框可过滤；「保存」立即生效
+## 选应用与调整顺序
 
-应用来源：用户与全局开始菜单、桌面与公共桌面的快捷方式，自动跳过卸载程序、
-帮助文档、网址书签。
+点 ✎ 打开编辑器（**非模态**，容器仍可操作）：
 
-## 配置
+- 左侧「当前显示顺序」：已选应用列表，每行有 ▲ ▼ ✕ 三个按钮，可**上移 / 下移 / 移除**
+- 右侧「全部应用」：勾选即加入容器，**加入顺序即显示顺序**
+- 顶部搜索框可过滤
+- 「全选 / 全不选 / 保存 / 取消」
 
-程序自动维护 `config.json`（首次运行自动生成）。完整字段说明见 `config.example.json`。
+应用来自用户与全局开始菜单、桌面与公共桌面的快捷方式，自动跳过卸载程序、帮助文档、网址书签等。
 
-```json
-{
-  "x": -9999,
-  "y": -9999,
-  "width": 416,
-  "height": 500,
-  "cols": 4,
-  "rows": 4,
-  "itemW": 96,
-  "itemH": 92,
-  "pinned": [],
-  "glass": "capture",
-  "winBg": "#99101418",
-  "topmost": true
-}
+## 配置文件
+
+`config.json` 由程序自动维护：
+
+| 字段 | 含义 | 默认 |
+|---|---|---|
+| `x` / `y` | 容器位置（逻辑坐标） | 右下角 |
+| `width` / `height` | 面板尺寸 | 216 × 242 |
+| `cols` / `rows` | 每行几列、可见几行 | 4 / 4 |
+| `itemW` / `itemH` | 每个图标格尺寸 | 53 / 40 |
+| `pinned` | 已选应用名列表（顺序即显示顺序） | `[]` |
+| `dockMode` | `normal`（顶层窗口，会被其他窗口盖住）/ `desktop`（嵌入桌面图标层） | `normal` |
+| `theme` | `auto`（跟随 Windows 深浅模式）/ `dark` / `light` | `auto` |
+| `glass` | `capture`（抓屏高斯模糊）/ `blur` `acrylic`（走 DWM，部分机器无效）/ `none` | `capture` |
+| `blurRadius` | 高斯模糊半径，**越大越糊越明显** | `22` |
+| `topmost` | 是否常驻最前 | `false` |
+| `selfcheck` | 启动 3 秒后把面板自身渲染成 `selfcheck-internal.png`，用于排查渲染问题 | `false` |
+
+### 让它更"玻璃"一点
+
+两个旋钮：
+
+- **`blurRadius`**（默认 22）：模糊强度。想要更明显的磨砂感就加大到 30~40。
+- **面板透明度**：在代码顶部的 `$Script:Palette` 里改 `panel` 的 alpha。深色 `#B3101418`、浅色 `#B3FFFFFF`，
+  把 `B3`（70%）降到 `80`（50%）会更透。
+
+### 深浅模式跟随
+
+`theme: "auto"` 时每 3 秒检查一次 Windows 的「应用界面」深浅设置，
+**变化就立刻换肤，不需要重启**。已验证：系统切深色后 12 秒内跟随，切回浅色 6 秒内跟上。
+
+它读的是 `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize\AppsUseLightTheme`，
+跟 [ThemeAutoSwitch](https://github.com/Landman-Chio/ThemeAutoSwitch) 写的是同一处 —— 所以两个工具可以配合使用。
+
+### 窗口层级：只停留在桌面
+
+| `dockMode` | 行为 | 可靠性 |
+|---|---|---|
+| `normal`（默认） | 普通顶层窗口、**不置顶**。点一下或用 `Ctrl+Alt+D` 唤到最前；被其他窗口盖住 | 所有系统都能渲染 |
+| `desktop` | 嵌入桌面图标层，**其他窗口不会盖住它**，真正做到"只在桌面" | ⚠️ 依赖桌面层级结构，部分机器不渲染 |
+
+先用探针自查你的机器适不适合 `desktop`：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\DesktopDock.ps1 -Action probe
 ```
 
-**调玻璃浓淡**：改 `winBg` 的 alpha 通道。
-`#66000000` 更透（玻璃感强），`#CC000000` 更实（文字更清楚）。建议 `#88` ~ `#BB`。
+它会枚举桌面窗口层级并给出结论。**如果提示"桌面层级结构异常"，就保持 `normal`。**
 
-**首选项位置**：`x` / `y` 设 `-9999` 表示自动贴右下角。直接拖动面板也会更新它们。
+> ⚠️ 改 `height` 时要保证 **26(按钮) + itemH×rows + 34(搜索) + 22(提示) ≤ height**，
+> 否则后面的区域会被挤出窗口导致点不到。
+## 开机自启
 
-> ⚠️ 改 `height` 时要保证 `44 + itemH×rows + 50 + 26 ≤ height`
-> （标题栏 + 图标区 + 搜索栏 + 提示行）。否则下方区域会被挤出窗口，点不到。
-> 这个坑我踩过。
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\autostart.ps1 -Action install
+powershell -NoProfile -ExecutionPolicy Bypass -File .\autostart.ps1 -Action status
+powershell -NoProfile -ExecutionPolicy Bypass -File .\autostart.ps1 -Action remove
+```
 
-## 玻璃是怎么实现的（重点）
+只在「启动」文件夹放一个快捷方式，不需要管理员权限。
 
-**没用 DWM。** 试过 `SetWindowCompositionAttribute` 的
-`ACCENT_ENABLE_ACRYLICBLURBEHIND` 和 `ACCENT_ENABLE_BLURBEHIND`，
-在目标机器（Windows 11 26100）上**两个都返回成功，但屏幕上什么都不画**；
-而用较大不透明度的白色染色时，它会输出**整块纯白**，把整个面板盖成白板。
+## 卸载
 
-现在改用自实现方案，不依赖任何系统 API：
+删掉整个 `DesktopDock` 文件夹即可。若启用了开机自启，先跑一次 `-Action remove`。
 
-1. `Graphics.CopyFromScreen` 抓取面板背后的桌面区域（比窗口大一圈，避免模糊后边缘发暗）
-2. `DrawingVisual` 把抓到的图按窗口位置对齐画到窗口尺寸的画布
-3. 套 WPF `BlurEffect`（`Gaussian` 核，半径 18）
-4. 作为最底层 `Image`，上压一层 `winBg` 半透明染色，再上面才是内容
+本工具**不写注册表、不装服务、不加驱动、不改系统设置**，纯用户态运行。
 
-副作用：**背后的画面不会实时更新**。拖动窗口会重新抓取，但如果有窗口在容器下方移动，
-玻璃里的倒影不会跟着变。对桌面挂件可以接受。
-
-`glass` 可选值：`capture`（推荐）/ `blur`、`acrylic`（走 DWM，部分机器无效）/ `none`。
-
-## 排查
-
-日志在 `desktopdock.log`。
-
-**想知道内容有没有正常渲染**（不靠肉眼判断）：把 `selfcheck` 设为 `true`，
-启动 3 秒后会把面板自身渲染成 `selfcheck-internal.png`，并统计亮像素比例。
-这张图不经过 DWM 合成，所以能直接区分「内容没画出来」和「画了但被别的东西盖住」——
-排查白屏类问题很有用。
-
-## 已知限制
-
-- **`Ctrl + Alt + D` 和拖动未经真人充分验证。** 我用合成鼠标事件测过（都能工作），
-  但真人操作的边界情况（拖到屏幕边缘、连点、多显示器）可能还有问题。
-  欢迎提 issue。
-- **画面不实时更新**，见上。
-- **单显示器**。多显示器下定位逻辑未验证。
-- 启动时扫描快捷方式，**约 70~90 个应用需要 1~2 秒**。
-
-## 源码文件
+## 实现说明（改代码必读）
 
 | 文件 | 作用 |
 |---|---|
 | `DesktopDock.ps1` | 主程序：WPF 界面、应用扫描、搜索、编辑器、拖动、快捷键 |
-| `native.cs` | Win32 互操作：z 序控制、不抢焦点、键盘钩子、圆角 |
-| `launcher.vbs` | 静默启动器 |
+| `native.cs` | Win32 互操作：高斯玻璃、z 序、圆角、键盘钩子 |
+| `启动容器.vbs` | 静默启动器 |
 | `autostart.ps1` | 开机自启开关 |
-| `config.json` | 配置（**不进 git**，首次运行生成） |
-| `config.example.json` | 带注释的配置示例 |
+| `desktopdock.log` | 运行日志 |
 
----
+### 玻璃效果怎么实现的（重要）
 
-<a name="english"></a>
+**没有用 DWM。** 试过 `SetWindowCompositionAttribute` 的 `ACCENT_ENABLE_ACRYLICBLURBEHIND` 和
+`ACCENT_ENABLE_BLURBEHIND`：**两个都返回成功，但屏幕上什么都不画**（像素采样证实面板内是纯黑，
+和无玻璃时一模一样）。而用大不透明度白色染色时，它会输出**整块纯白** —— 这就是最初你看到的白屏。
 
-## English
+现在用的是自实现方案，不依赖任何系统 API：
 
-**A frosted-glass desktop panel that holds your frequently used apps: a 4×4 icon grid
-with a built-in search box.**
+1. 用 `Graphics.CopyFromScreen` 抓取面板背后的桌面区域（比窗口大一圈，避免模糊后边缘发暗）
+2. 用 `DrawingVisual` 把抓到的图按窗口位置对齐画到窗口尺寸的画布上
+3. 套 WPF `BlurEffect`（`Gaussian`、半径 18）
+4. 作为最底层 `Image`，上面压一层随主题变化的面板色，再上面才是内容
 
-![DesktopDock screenshot](preview.png)
+副作用是**背后的画面不会实时更新** —— 拖动窗口时会重新抓取，但如果有窗口在容器下面移动，
+玻璃里的倒影不会跟着变。对桌面挂件来说可以接受。
 
-Click an icon to launch it, type to search, scroll for more, drag it anywhere.
+### 踩过的坑（都是实测确认的）
 
-### Download
+1. **桌面 WorkerW 嵌入不可行**。试过把窗口 `SetParent` 到桌面图层（那样 Win+D 不会隐藏它），
+   `SetParent` 成功、`SetWindowPos` 返回 True、窗口矩形也正确，但在 Windows 11 26100 上
+   **完全不渲染** —— 肉眼和截图都证实了。改用「顶层窗口 + `WS_EX_TOPMOST`」。
 
-| Option | How | Notes |
-|---|---|---|
-| **ZIP (recommended)** | **Code → Download ZIP**, unzip, double-click `launcher.vbs` | Includes everything plus an example config |
-| git clone | `git clone https://github.com/Landman-Chio/DesktopDock.git` | Easy to `git pull` for updates |
-| Single file | Open a file, click **Raw** | Works, but you will **miss the `config.example.json`** |
+2. **不能用 `WS_EX_NOACTIVATE`**。它会占住「不抢焦点」，但代价是窗口**永远拿不到键盘输入**，
+   搜索框就没法用。现在只用 `WS_EX_TOOLWINDOW`（不进任务栏/Alt+Tab）。
 
-> Verified: a `.vbs` downloaded on its own (even with LF line endings) still runs on double-click.
+3. **`SetWindowPos` 的 `hWndInsertAfter` 不能传 `IntPtr.Zero`**（那等于 `HWND_TOP`），
+   会**摘掉 `WS_EX_TOPMOST`**，窗口就被别的窗口盖住了。要用 `HWND_TOPMOST`（见 `MoveKeepTop`）。
 
-### Features
+4. **别在分层窗口上改 z 序**。亚克力模糊会让窗口带 `WS_EX_LAYERED`，此时再调
+   `SetWindowPos` 改 z 序会让**进程直接异常退出**（不写任何日志）。隐藏/唤出因此改成
+   「取消置顶 + 移到屏幕外」，不用 `Window.Hide()`（同样会崩）。
 
-- **Real Gaussian glass** — the backdrop is actually blurred, not just semi-transparent
-- **4×4 grid** — 4 per row, 4 rows visible; scroll for the rest
-- **Search box** — searches **all installed apps**, not just the ones shown
-- **Icon buttons** — edit ✎ / hide ◡ / quit ⏻
-- **Draggable** — position is remembered automatically
-- **Custom order** — reorder with ▲▼ in the editor; selection order is display order
-- **Global hotkey** — `Ctrl + Alt + D` to hide / show
-- **Zero dependencies** — pure PowerShell + WPF, no SDK, no admin rights
+5. **鼠标「抬起」消息收不到**。分层窗口下 WPF 的隐式鼠标捕获失效，`MouseLeftButtonUp`
+   连预览事件都不触发。所以点击判定改成：按下瞬间入队，180ms 后校验光标位移，
+   超过 4 像素就当拖动撤销（见 `$Script:QueueClick`）。
 
-No admin rights. No registry writes, no services, no drivers — **uninstalling means
-deleting the folder**.
+6. **`$Script:DragMoved` 必须在控件按下时重置**。窗口级按下处理器遇到 TextBox 会提前 return，
+   标志会一直停在 `true`，导致之后所有点击都被误判成拖动而失效。
 
-### Quick start
+7. **`UniformGrid` 必须 `VerticalAlignment='Top'`**。否则结果少时整个网格会被垂直居中，
+   图标位置随结果数量漂移，点击位置对不上。
 
-Windows 10 / 11 with the built-in PowerShell 5.1 and WPF.
+8. **函数返回数组要用逗号**：`return ,$list`。否则单元素数组会被 PowerShell 拆成标量，
+   调用方拿到的不是数组，`$list.Count` 会变成空值。
 
-**Double-click `launcher.vbs`.** The panel appears near the bottom-right corner.
+9. **`.ps1` 必须存成 UTF-8 with BOM**，否则 PowerShell 5.1 在中文系统上按 ANSI 读，
+   中文字符会吃掉字符串引号导致解析失败。而且**脚本运行中无法重写自身**（文件被占用），
+   改完要么先退出程序，要么用另一个进程写。
 
-To run at login:
-
-```powershell
-.\autostart.ps1 -Action install
-```
-
-### How the glass is implemented
-
-**Not via DWM.** `SetWindowCompositionAttribute` with both
-`ACCENT_ENABLE_ACRYLICBLURBEHIND` and `ACCENT_ENABLE_BLURBEHIND` **returned success but
-rendered nothing** on the target machine (Windows 11 build 26100); with a whiter tint it
-rendered an **opaque white panel** that hid all content.
-
-Instead the backdrop is built manually:
-
-1. `Graphics.CopyFromScreen` captures the desktop region behind the panel (slightly
-   larger, to avoid dark edges after blurring)
-2. A `DrawingVisual` draws that capture aligned to the window, on a window-sized canvas
-3. A WPF `BlurEffect` (Gaussian, radius 18) is applied
-4. It becomes the bottom-most `Image`, with a `winBg` translucent tint above it and the
-   real content on top
-
-The tradeoff: **the backdrop is not live.** It is re-captured when you drag the panel,
-but if a window moves behind the panel, the reflection does not follow. Acceptable for a
-desktop widget.
-
-### Configuration
-
-`config.json` is generated on first run from `config.example.json`'s schema.
-
-Tune the glass with the alpha channel of `winBg`: `#66000000` is more transparent,
-`#CC000000` is more solid. `#88`–`#BB` is a good range.
-
-> ⚠️ When changing `height`, keep `44 + itemH×rows + 50 + 26 ≤ height`, otherwise the
-> lower rows get pushed outside the window and become unclickable.
-
-### Known limitations
-
-- `Ctrl + Alt + D` and dragging have **not been verified extensively by a human**;
-  they were tested with synthetic mouse events. Edge cases (screen edges, rapid clicks,
-  multiple monitors) may still misbehave. Issues welcome.
-- The glass backdrop is not live (see above).
-- **Single monitor only** — multi-monitor positioning is unverified.
-
-## License
-
-[MIT](LICENSE)
+10. **150% 缩放下坐标要当心**。进程声明 PerMonitorV2 后，WPF 的 `ActualWidth` 是 DIP、
+   `GetWindowRect` 是物理像素，两者相差 1.5 倍；而 DPI 不感知的进程调 `SetCursorPos`
+   时系统还会再缩放一次。`Apply-Position` 里统一用 `Get-Scale` 换算。
